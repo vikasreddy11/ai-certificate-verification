@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import Navbar from '../components/Navbar';
-import Footer from '../components/Footer';
-import api from '../utils/api';
+import Navbar from '../../components/Navbar';
+import Footer from '../../components/Footer';
+import api from '../../utils/api';
 
 export default function VerifyPage() {
   const router = useRouter();
