@@ -1,0 +1,18 @@
+file,expected_status,note
+test_certificates\real\CERT-AIT-2024-00060.png,VERIFIED,matches DB
+test_certificates\real\CERT-BSU-2025-00061.png,VERIFIED,matches DB
+test_certificates\real\CERT-CNC-2026-00062.png,VERIFIED,matches DB
+test_certificates\real\CERT-AIT-2024-00063.png,VERIFIED,matches DB
+test_certificates\real\CERT-BSU-2025-00064.png,VERIFIED,matches DB
+test_certificates\real\CERT-CNC-2026-00065.png,VERIFIED,matches DB
+test_certificates\tampered\name_CERT-AIT-2024-00066.png,MISMATCH,name replaced with another student's
+test_certificates\tampered\roll_CERT-BSU-2025-00067.png,MISMATCH,roll number altered
+test_certificates\tampered\year_CERT-CNC-2026-00068.png,MISMATCH,graduation year altered
+test_certificates\tampered\course_CERT-AIT-2024-00069.png,MISMATCH,degree upgraded/changed
+test_certificates\tampered\department_CERT-BSU-2025-00070.png,MISMATCH,department changed
+test_certificates\revoked\CERT-CNC-2026-00095.png,REVOKED,revoked by institution
+test_certificates\revoked\CERT-AIT-2024-00096.png,REVOKED,revoked by institution
+test_certificates\tampered\multiple_CERT-CNC-2026-00071.png,MISMATCH,name + roll number + year altered
+test_certificates\fake\fake_qr_CERT-AIT-2026-99999.png,NOT_FOUND,QR id not in database
+test_certificates\fake\fake_qr_CERT-BSU-2025-88888.png,NOT_FOUND,QR id not in database
+test_certificates\fake\fake_qr_CERT-CNC-2024-77777.png,NOT_FOUND,QR id not in database

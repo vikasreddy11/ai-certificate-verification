@@ -11,9 +11,30 @@ from app.core.deps import get_current_user
 from app.core.security import verify_certificate_signature
 from app.models import Certificate, Student, College, VerificationLog, VerificationStatus, CertificateStatus, User, UserRole
 from app.schemas import VerificationResultOut
-from app.services.ocr_service import run_ocr, extract_structured_fields
+from app.services.ocr_service import run_ocr, extract_structured_fields, decode_qr_certificate_id
+import re
 
 router = APIRouter()
+
+def normalize_str(val: Any, field: str = "") -> str:
+    s = str(val or "").strip().lower()
+    s = s.replace(".", "").replace("-", " ")
+    abbreviations = {
+        "bachelor of technology": "btech",
+        "bachelor of science": "bsc",
+        "master of technology": "mtech",
+        "master of business administration": "mba",
+        "computer science and engineering": "computer science",
+    }
+    for full, abbr in abbreviations.items():
+        s = s.replace(full, abbr)
+    s = " ".join(s.split())
+    if field in ("student_name", "roll_number"):
+        # OCR often drops spaces in bold/uppercase text and confuses I / l / 1 and O / 0.
+        s = re.sub(r"[^a-z0-9]", "", s)
+        s = s.translate(str.maketrans({"l": "i", "1": "i", "|": "i", "o": "0"}))
+    return s
+
 
 def compare_records(official: Dict[str, Any], extracted: Dict[str, Any]):
     matching = {}
@@ -25,8 +46,8 @@ def compare_records(official: Dict[str, Any], extracted: Dict[str, Any]):
         off_val = official.get(f)
         ext_val = extracted.get(f)
         if ext_val is not None:
-            # Normalized case-insensitive comparison
-            if str(off_val).strip().lower() == str(ext_val).strip().lower():
+            # Normalized comparison
+            if normalize_str(off_val, f) == normalize_str(ext_val, f):
                 matching[f] = {"official": off_val, "extracted": ext_val}
             else:
                 mismatches[f] = {"official": off_val, "extracted": ext_val}
@@ -147,7 +168,8 @@ async def verify_by_upload(
     raw_ocr_text = run_ocr(file_bytes)
     extracted = extract_structured_fields(raw_ocr_text)
 
-    target_cert_id = certificate_id or extracted.get("certificate_id")
+    # Prefer the QR code on the document, then the typed id, then the OCR'd printed id
+    target_cert_id = certificate_id or decode_qr_certificate_id(file_bytes) or extracted.get("certificate_id")
     now = datetime.utcnow()
 
     if not target_cert_id:
@@ -168,6 +190,18 @@ async def verify_by_upload(
     )
     result = await db.execute(query)
     cert = result.scalars().first()
+
+    if not cert:
+        # OCR may read 'I' as 'l' in the college code (CERT-AlT-...): retry with the fix
+        parts = target_cert_id.split("-")
+        if len(parts) == 4:
+            parts[1] = parts[1].upper().replace("L", "I")
+            retry = await db.execute(
+                select(Certificate)
+                .options(selectinload(Certificate.student), selectinload(Certificate.college))
+                .where(Certificate.certificate_id == "-".join(parts))
+            )
+            cert = retry.scalars().first()
 
     if not cert:
         return VerificationResultOut(

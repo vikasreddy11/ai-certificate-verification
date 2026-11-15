@@ -62,13 +62,22 @@ export default function PublicVerifyPage() {
                   <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 text-2xl font-bold mb-3 shadow-inner">
                     ✓
                   </div>
-                ) : (
+                ) : result.verification_status === 'REVOKED' ? (
                   <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-100 text-red-600 text-2xl font-bold mb-3 shadow-inner">
+                    ⊘
+                  </div>
+                ) : (
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-amber-100 text-amber-600 text-2xl font-bold mb-3 shadow-inner">
                     ✕
                   </div>
                 )}
                 <h3 className="text-xl font-bold text-slate-900">{result.verification_status}</h3>
                 <p className="text-sm text-slate-500 mt-1">{result.message}</p>
+                {result.verification_status === 'NOT_FOUND' && (
+                  <p className="text-xs text-red-600 font-semibold mt-2 bg-red-50 py-1 px-3 rounded-full inline-block">
+                    The certificate ID from the QR code is not registered in the official database.
+                  </p>
+                )}
               </div>
 
               {result.official_record && (

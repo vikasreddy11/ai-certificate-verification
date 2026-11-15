@@ -4,118 +4,124 @@ from typing import Dict, Any, Optional
 
 try:
     import cv2
-except ImportError:
+except ImportError:  # pragma: no cover
     cv2 = None
 
-try:
-    from paddleocr import PaddleOCR
-    # Initialize OCR engine once
-    ocr_engine = PaddleOCR(use_angle_cls=True, lang='en', show_log=False)
-except Exception:
-    ocr_engine = None
+_engine = None
+_engine_failed = False
 
-def preprocess_image(image_bytes: bytes):
-    """
-    OpenCV Document Preprocessing Pipeline:
-    - Decode bytes
-    - Grayscale conversion
-    - Denoising / Gaussian blur
-    - Adaptive or Otsu Thresholding
-    """
+
+def get_engine():
+    """Lazy-load RapidOCR (ONNX, ~100MB RAM, fits Render's free tier; no model download at runtime)."""
+    global _engine, _engine_failed
+    if _engine is None and not _engine_failed:
+        try:
+            from rapidocr_onnxruntime import RapidOCR
+            _engine = RapidOCR()
+        except Exception as e:
+            print(f"[!] OCR engine failed to load: {e}")
+            _engine_failed = True
+    return _engine
+
+
+def _decode(image_bytes: bytes):
     if cv2 is None:
         return None
-        
-    nparr = np.frombuffer(image_bytes, np.uint8)
-    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    arr = np.frombuffer(image_bytes, np.uint8)
+    return cv2.imdecode(arr, cv2.IMREAD_COLOR)
+
+
+def decode_qr_certificate_id(image_bytes: bytes) -> Optional[str]:
+    """Reads a QR code on the uploaded image and returns the certificate id from .../verify/<id>."""
+    img = _decode(image_bytes)
     if img is None:
         return None
+    try:
+        data, _, _ = cv2.QRCodeDetector().detectAndDecode(img)
+    except Exception:
+        return None
+    if not data:
+        return None
+    m = re.search(r"(CERT-[A-Za-z0-9]+-\d{4}-\d{4,6})", data, re.IGNORECASE)
+    return m.group(1).upper() if m else None
 
-    # Grayscale
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    
-    # Noise removal with bilateral filter to preserve edges
-    denoised = cv2.bilateralFilter(gray, 9, 75, 75)
-    
-    # Adaptive thresholding
-    thresh = cv2.adaptiveThreshold(
-        denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 2
-    )
-    return thresh, img
 
 def run_ocr(image_bytes: bytes) -> str:
-    """
-    Extracts text using PaddleOCR (with fallback to pure string simulation if OCR unavailable).
-    """
-    extracted_text = ""
-    if ocr_engine is not None and cv2 is not None:
-        try:
-            nparr = np.frombuffer(image_bytes, np.uint8)
-            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-            result = ocr_engine.ocr(img, cls=True)
-            if result and result[0]:
-                lines = [line[1][0] for line in result[0]]
-                extracted_text = "\n".join(lines)
-                return extracted_text
-        except Exception as e:
-            print(f"PaddleOCR error: {e}")
-
-    # Fallback heuristic parser for testing/mock environment
+    """Returns OCR text, one visual line per row. Returns '' if OCR is unavailable (-> manual review)."""
+    img = _decode(image_bytes)
+    engine = get_engine()
+    if img is None or engine is None:
+        return ""
     try:
-        extracted_text = image_bytes.decode("utf-8", errors="ignore")
-    except Exception:
-        extracted_text = ""
-        
-    return extracted_text
+        result, _ = engine(img)
+    except Exception as e:
+        print(f"[!] OCR execution error: {e}")
+        return ""
+    if not result:
+        return ""
+    # result items: [box, text, confidence]; sort top->bottom, left->right
+    items = sorted(result, key=lambda r: (round(np.mean([p[1] for p in r[0]]) / 12), r[0][0][0]))
+    return "\n".join(r[1] for r in items)
+
+
+def _has(text: str, alias: str) -> bool:
+    return re.search(r"(?<![a-z])" + re.escape(alias) + r"(?![a-z])", text) is not None
+
 
 def extract_structured_fields(raw_text: str) -> Dict[str, Any]:
-    """
-    NLP / Heuristic field extraction:
-    Extracts student_name, roll_number, college_code/name, degree, department, year, certificate_id.
-    """
     extracted = {
-        "certificate_id": None,
-        "student_name": None,
-        "roll_number": None,
-        "college_name": None,
-        "course": None,
-        "department": None,
-        "graduation_year": None
+        "certificate_id": None, "student_name": None, "roll_number": None,
+        "college_name": None, "course": None, "department": None, "graduation_year": None,
     }
+    lines = [l.strip() for l in raw_text.splitlines() if l.strip()]
 
-    # Match Certificate ID pattern: CERT-[COLLEGE]-[YEAR]-[NUM]
-    cert_id_match = re.search(r"CERT-[A-Z0-9]+-\d{4}-\d{5}", raw_text, re.IGNORECASE)
-    if cert_id_match:
-        extracted["certificate_id"] = cert_id_match.group(0).upper()
+    # Certificate ID
+    m = re.search(r"CERT[-_ ]?[A-Z0-9]+[-_ ]\d{4}[-_ ]\d{4,6}", raw_text, re.IGNORECASE)
+    if m:
+        extracted["certificate_id"] = re.sub(r"[_ ]", "-", m.group(0).upper())
 
-    # Match Roll Number (alphanumeric pattern or standard formats)
-    roll_match = re.search(r"(?:Roll|Reg(?:istration)?|ID)\s*(?:No|Number)?[:\s\-#]*([A-Z0-9\-]+)", raw_text, re.IGNORECASE)
-    if roll_match:
-        extracted["roll_number"] = roll_match.group(1).strip()
-
-    # Match Year (prefer explicit Graduation / Academic Year context)
-    grad_year_match = re.search(r"(?:academic\s*year|graduation\s*year|graduated\s*in|year\s*of\s*passing|year)[:\s\-]*([2][0][1-3][0-9])", raw_text, re.IGNORECASE)
-    if grad_year_match:
-        extracted["graduation_year"] = int(grad_year_match.group(1))
-    else:
-        year_match = re.search(r"\b(20[1-3][0-9])\b", raw_text)
-        if year_match:
-            extracted["graduation_year"] = int(year_match.group(1))
-
-    # Match Student Name (e.g., Name: John Doe or certifies that John Doe)
-    name_match = re.search(r"(?:certifies that|name\s*[:\s\-]|this is to certify that)\s*([A-Za-z\s\.]+)", raw_text, re.IGNORECASE)
-    if name_match:
-        extracted["student_name"] = name_match.group(1).split("\n")[0].strip()
-
-    # Match Department / Course
-    for course_type in ["B.Tech", "Bachelor of Technology", "B.Sc", "M.Tech", "MBA", "BCA", "MCA"]:
-        if course_type.lower() in raw_text.lower():
-            extracted["course"] = course_type
+    # Student name: the line after "This is to certify that"
+    for i, line in enumerate(lines):
+        if re.search(r"certi[tf]y\s*that", line, re.IGNORECASE):
+            tail = re.split(r"certi[tf]y\s*that", line, flags=re.IGNORECASE)[-1].strip()
+            cand = tail if len(tail) > 2 else (lines[i + 1].strip() if i + 1 < len(lines) else "")
+            if len(cand) > 2 and not cand.lower().startswith("bearing"):
+                extracted["student_name"] = cand
             break
 
-    for dept in ["Computer Science", "Information Technology", "Mechanical Engineering", "Civil Engineering", "Electronics"]:
-        if dept.lower() in raw_text.lower():
-            extracted["department"] = dept
+    # Roll number: explicit label first, then college-code pattern
+    m = re.search(r"roll\s*(?:no\.?|number)?\s*[:#\-]?\s*([A-Za-z0-9]{2,5}[-_][0-9]{4}[-_][0-9]{3,5})", raw_text, re.IGNORECASE)
+    if not m:
+        m = re.search(r"\b([A-Z][A-Za-z]{2,3}[-_]\d{4}[-_]\d{4,5})\b", raw_text)
+    if m:
+        roll = m.group(1).replace("_", "-").upper()
+        extracted["roll_number"] = roll
+
+    # Graduation year
+    m = re.search(r"(?:academic\s*year|graduation\s*year|graduated\s*in|year\s*of\s*passing)[:\s\-]*(20[1-3]\d)", raw_text, re.IGNORECASE)
+    if m:
+        extracted["graduation_year"] = int(m.group(1))
+
+    low = raw_text.lower()
+    for std, aliases in [
+        ("Bachelor of Technology", ["bachelor of technology", "b.tech", "btech"]),
+        ("Bachelor of Science", ["bachelor of science", "b.sc", "bsc"]),
+        ("Master of Technology", ["master of technology", "m.tech", "mtech"]),
+        ("Master of Business Administration", ["master of business administration", "mba"]),
+    ]:
+        if any(_has(low, a) for a in aliases):
+            extracted["course"] = std
+            break
+
+    for std, aliases in [
+        ("Computer Science", ["computer science", "computer science and engineering", "cse"]),
+        ("Information Technology", ["information technology"]),
+        ("Mechanical Engineering", ["mechanical engineering"]),
+        ("Electrical Engineering", ["electrical engineering", "eee"]),
+        ("Civil Engineering", ["civil engineering"]),
+    ]:
+        if any(_has(low, a) for a in aliases):
+            extracted["department"] = std
             break
 
     return extracted
-

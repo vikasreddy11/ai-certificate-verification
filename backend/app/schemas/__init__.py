@@ -21,7 +21,7 @@ class UserCreate(BaseModel):
     full_name: str
     email: EmailStr
     password: str
-    role: UserRole
+    role: UserRole = UserRole.COMPANY
     college_id: Optional[int] = None
     company_name: Optional[str] = None
 
