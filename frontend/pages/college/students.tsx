@@ -117,7 +117,7 @@ export default function CollegeStudentsPage() {
           placeholder="Search by student name or roll number..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full max-w-md border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-600 shadow-sm"
+          className="w-full max-w-md min-h-[44px] border border-slate-300 rounded-xl px-4 py-2.5 text-base focus:outline-none focus:border-blue-600 shadow-sm"
         />
       </div>
 
@@ -127,7 +127,8 @@ export default function CollegeStudentsPage() {
         ) : students.length === 0 ? (
           <div className="p-8 text-center text-slate-500">No student records found.</div>
         ) : (
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
+          <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200 text-sm hidden sm:table">
             <thead className="bg-slate-50 text-slate-600 uppercase text-xs font-semibold">
               <tr>
                 <th className="px-6 py-4 text-left">Roll Number</th>
@@ -156,6 +157,16 @@ export default function CollegeStudentsPage() {
               ))}
             </tbody>
           </table>
+          <div className="sm:hidden divide-y divide-slate-100">
+            {students.map((stu) => (
+              <div key={stu.id} className="p-4 space-y-1">
+                <div className="font-semibold text-slate-900">{stu.student_name}</div>
+                <div className="font-mono text-sm text-blue-600">{stu.roll_number}</div>
+                <div className="text-sm text-slate-600">{stu.department} · {stu.course} · {stu.graduation_year}</div>
+              </div>
+            ))}
+          </div>
+          </div>
         )}
       </div>
 

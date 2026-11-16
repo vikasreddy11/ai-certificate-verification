@@ -61,6 +61,7 @@ async def verify_by_id(certificate_id: str, db: AsyncSession = Depends(get_db)):
     """
     Public QR-code verification endpoint: Retrieves and validates official database records.
     """
+    certificate_id = (certificate_id or "").strip().upper()
     query = (
         select(Certificate)
         .options(selectinload(Certificate.student), selectinload(Certificate.college))
@@ -164,20 +165,18 @@ async def verify_by_upload(
     Public / Recruiter verification pipeline:
     Accepts PNG/JPG/JPEG/WEBP image, reads QR code, runs OCR, extracts fields, and matches against the database.
     """
-    # Validate content type
+    file_bytes = await file.read()
+    if len(file_bytes) > 8 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File too large. Maximum file size allowed is 8 MB.")
+
     allowed_types = {"image/png", "image/jpeg", "image/jpg", "image/webp"}
     content_type = (file.content_type or "").lower()
-    if content_type not in allowed_types:
-        filename = (file.filename or "").lower()
-        if not any(filename.endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".webp"]):
-            raise HTTPException(
-                status_code=400,
-                detail="Unsupported file format. Please upload a certificate image (PNG, JPG, JPEG, WEBP). PDF documents are not supported yet."
-            )
-
-    file_bytes = await file.read()
-    if len(file_bytes) > 5 * 1024 * 1024:
-        raise HTTPException(status_code=413, detail="File too large. Maximum file size allowed is 5 MB.")
+    filename = (file.filename or "").lower()
+    if content_type not in allowed_types and not any(filename.endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".webp"]):
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported file format. Please upload a certificate image (PNG, JPG, JPEG, WEBP). PDF documents are not supported yet."
+        )
 
     raw_ocr_text = run_ocr(file_bytes)
     extracted = extract_structured_fields(raw_ocr_text)

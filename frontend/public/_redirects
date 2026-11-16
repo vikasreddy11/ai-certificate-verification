@@ -1,2 +1,2 @@
-/api/*  https://certiverify-backend-rmvy.onrender.com/api/:splat  200
-/*      /index.html                                               200
+# Next.js routing is handled by @netlify/plugin-nextjs.
+# Do not add a SPA catch-all to /index.html — it breaks /verify/:id QR deep links.

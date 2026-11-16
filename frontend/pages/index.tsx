@@ -38,6 +38,7 @@ export default function LandingPage() {
     <div className="min-h-screen bg-white text-slate-900 flex flex-col justify-between">
       <Head>
         <title>CertiVerify AI - Enterprise Fake Certificate Detection & Verification Platform</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta
           name="description"
           content="AI-based and cryptographic certificate verification platform bridging institutions and recruiters with Ed25519 digital signatures and OCR discrepancy detection."
@@ -67,32 +68,22 @@ export default function LandingPage() {
           {/* Primary Action Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 max-w-xl mx-auto">
             <Link
-              href="/verify?tab=qr"
-              className="w-full sm:w-auto px-7 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-500/25 transition flex items-center justify-center space-x-2.5"
+              href="/verify"
+              className="w-full sm:w-auto min-h-[44px] px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg shadow-blue-500/25 transition flex items-center justify-center text-base"
             >
-              <span>📷</span>
-              <span>Scan QR Code</span>
+              Verify a certificate
             </Link>
 
             <Link
-              href="/verify?tab=upload"
-              className="w-full sm:w-auto px-7 py-4 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold shadow-lg shadow-purple-500/20 transition flex items-center justify-center space-x-2.5"
+              href="/login"
+              className="w-full sm:w-auto min-h-[44px] px-6 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-semibold transition flex items-center justify-center text-sm"
             >
-              <span>📄</span>
-              <span>Upload Certificate</span>
-            </Link>
-
-            <Link
-              href="/portal/institution"
-              className="w-full sm:w-auto px-7 py-4 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold transition flex items-center justify-center space-x-2"
-            >
-              <span>🏛️</span>
-              <span>Institution Portal</span>
+              Admin login
             </Link>
           </div>
 
           {/* Quick Subtext Trust Signal */}
-          <div className="mt-8 flex items-center justify-center space-x-6 text-xs text-slate-500">
+          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 text-xs text-slate-500">
             <span className="flex items-center space-x-1.5">
               <span className="text-emerald-500 font-bold">✓</span>
               <span>Tamper-evident QR Tokens</span>
@@ -369,75 +360,42 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* PORTAL ENTRY CARDS */}
         <section className="py-20 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-2xl mx-auto mb-14">
-            <span className="text-xs uppercase px-3 py-1 bg-slate-100 text-slate-800 rounded-full font-bold tracking-wider mb-2 inline-block">
-              Tailored Portals
-            </span>
+          <div className="text-center max-w-2xl mx-auto mb-10">
             <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">
-              Choose Your Dedicated Portal
+              Anyone can verify. Admins issue credentials.
             </h2>
             <p className="text-sm text-slate-500 mt-2">
-              Select your organization type to access specialized credential management tools.
+              Public verification needs no account. Login is only for college administrators and the super admin.
             </p>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Institution Card */}
-            <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-md hover:shadow-lg transition flex flex-col justify-between">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto">
+            <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-md flex flex-col justify-between">
               <div>
-                <div className="w-12 h-12 bg-blue-100 text-blue-600 font-bold rounded-2xl flex items-center justify-center text-2xl mb-6">
-                  🏛️
-                </div>
-                <h3 className="text-xl font-bold text-slate-900 mb-2">Educational Institutions</h3>
-                <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-                  For registrars, colleges, and university examination boards to enroll cohorts, digitally sign degrees, and distribute high-res QR codes.
+                <h3 className="text-xl font-bold text-slate-900 mb-2">Verify a certificate</h3>
+                <p className="text-sm text-slate-600 mb-6">
+                  Scan a QR code, type a certificate ID, or upload a photo. No login required.
                 </p>
               </div>
               <Link
-                href="/portal/institution"
-                className="w-full text-center py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition"
+                href="/verify"
+                className="w-full min-h-[44px] text-center py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm"
               >
-                Access Institution Portal →
+                Open public verification
               </Link>
             </div>
-
-            {/* Recruiter Card */}
-            <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-md hover:shadow-lg transition flex flex-col justify-between">
+            <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-md flex flex-col justify-between">
               <div>
-                <div className="w-12 h-12 bg-purple-100 text-purple-600 font-bold rounded-2xl flex items-center justify-center text-2xl mb-6">
-                  💼
-                </div>
-                <h3 className="text-xl font-bold text-slate-900 mb-2">Companies & Recruiters</h3>
-                <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-                  For HR teams and background check agencies to scan credentials, upload candidate transcripts, and detect discrepancies with AI/OCR.
+                <h3 className="text-xl font-bold text-slate-900 mb-2">Admin login</h3>
+                <p className="text-sm text-slate-600 mb-6">
+                  College admins add students and issue or revoke certificates. Super admins manage institutions and analytics.
                 </p>
               </div>
               <Link
-                href="/portal/company"
-                className="w-full text-center py-3 px-4 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-sm transition"
+                href="/login"
+                className="w-full min-h-[44px] text-center py-3 px-4 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-sm"
               >
-                Access Recruiter Portal →
-              </Link>
-            </div>
-
-            {/* Super Admin Card */}
-            <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-md hover:shadow-lg transition flex flex-col justify-between">
-              <div>
-                <div className="w-12 h-12 bg-slate-100 text-slate-800 font-bold rounded-2xl flex items-center justify-center text-2xl mb-6">
-                  🛡️
-                </div>
-                <h3 className="text-xl font-bold text-slate-900 mb-2">Super Administrator</h3>
-                <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-                  For platform administrators to oversee registered institutions, inspect system audit logs, configure security keys, and reset demo data.
-                </p>
-              </div>
-              <Link
-                href="/portal/admin"
-                className="w-full text-center py-3 px-4 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-sm transition"
-              >
-                Access Admin Console →
+                Admin login
               </Link>
             </div>
           </div>

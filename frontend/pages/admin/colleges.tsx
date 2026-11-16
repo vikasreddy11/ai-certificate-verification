@@ -109,7 +109,8 @@ export default function SuperAdminCollegesPage() {
         ) : colleges.length === 0 ? (
           <div className="p-8 text-center text-slate-500">No colleges registered yet.</div>
         ) : (
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
+          <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200 text-sm hidden sm:table">
             <thead className="bg-slate-50 text-slate-600 uppercase text-xs font-semibold">
               <tr>
                 <th className="px-6 py-4 text-left">Code</th>
@@ -155,6 +156,30 @@ export default function SuperAdminCollegesPage() {
               ))}
             </tbody>
           </table>
+          <div className="sm:hidden divide-y divide-slate-100">
+            {colleges.map((col) => (
+              <div key={col.id} className="p-4 space-y-2">
+                <div className="font-semibold text-slate-900">{col.college_name}</div>
+                <div className="text-sm text-blue-600 font-bold">{col.college_code}</div>
+                <div className="text-sm text-slate-600 break-all">{col.official_email}</div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => { setSelectedCollege(col); setShowAdminModal(true); }}
+                    className="min-h-[44px] px-3 bg-slate-100 text-slate-700 rounded text-xs font-medium"
+                  >
+                    + Add Admin
+                  </button>
+                  <button
+                    onClick={() => handleDeleteCollege(col.id)}
+                    className="min-h-[44px] px-3 bg-red-50 text-red-600 rounded text-xs font-medium"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+          </div>
         )}
       </div>
 

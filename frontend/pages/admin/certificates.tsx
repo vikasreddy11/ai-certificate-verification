@@ -122,6 +122,7 @@ export default function AdminCertificatesPage() {
         ) : filteredCerts.length === 0 ? (
           <div className="p-8 text-center text-slate-500">No matching certificates found.</div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-50 text-slate-600 uppercase text-xs font-semibold">
               <tr>
@@ -178,6 +179,7 @@ export default function AdminCertificatesPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

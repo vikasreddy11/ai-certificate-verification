@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional, List
 from datetime import datetime
 from app.models import UserRole, CertificateStatus, VerificationStatus
@@ -17,6 +17,11 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
+    @field_validator("email", mode="before")
+    @classmethod
+    def clean_email(cls, v):
+        return v.strip().lower() if isinstance(v, str) else v
+
 class UserCreate(BaseModel):
     full_name: str
     email: EmailStr
@@ -24,6 +29,11 @@ class UserCreate(BaseModel):
     role: UserRole = UserRole.COMPANY
     college_id: Optional[int] = None
     company_name: Optional[str] = None
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def clean_email(cls, v):
+        return v.strip().lower() if isinstance(v, str) else v
 
 class UserOut(BaseModel):
     id: int

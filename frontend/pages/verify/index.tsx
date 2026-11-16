@@ -1,29 +1,38 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Head from 'next/head';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/router';
 import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
+<<<<<<< HEAD
 import api from '../../utils/api';
+=======
+import VerificationResult from '../../components/VerificationResult';
+import api, { withWakeRetry } from '../../utils/api';
+import { downscaleImage } from '../../utils/image';
+import { fetchVerification, validateCertificateId, verifyRequestError } from '../../utils/verifyApi';
+
+const QrScanner = dynamic(() => import('../../components/QrScanner'), { ssr: false });
+>>>>>>> 2e22d99 (updates)
 
 export default function VerifyPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'scan' | 'upload' | 'id'>('scan');
+  const [scannerOn, setScannerOn] = useState(false);
 
-  // ID search
   const [certIdInput, setCertIdInput] = useState('');
   const [idLoading, setIdLoading] = useState(false);
+  const [idSlow, setIdSlow] = useState(false);
   const [idError, setIdError] = useState('');
+  const [idResult, setIdResult] = useState<any>(null);
 
-  // Upload verify
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState('');
   const [uploadLoading, setUploadLoading] = useState(false);
+  const [uploadSlow, setUploadSlow] = useState(false);
   const [uploadResult, setUploadResult] = useState<any>(null);
   const [uploadError, setUploadError] = useState('');
-
-  // Camera QR scanner state
-  const [scannerStarted, setScannerStarted] = useState(false);
-  const [cameraError, setCameraError] = useState('');
-  const html5QrCodeRef = useRef<any>(null);
+  const slowTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (router.query.tab === 'upload') setActiveTab('upload');
@@ -37,67 +46,72 @@ export default function VerifyPage() {
 
   useEffect(() => {
     return () => {
-      stopCameraScanner();
+      if (slowTimer.current) clearTimeout(slowTimer.current);
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
-  }, []);
+  }, [previewUrl]);
 
-  const handleIdSubmit = (e: React.FormEvent) => {
+  const markSlow = (setter: (v: boolean) => void) => {
+    if (slowTimer.current) clearTimeout(slowTimer.current);
+    setter(false);
+    slowTimer.current = setTimeout(() => setter(true), 4000);
+  };
+
+  const handleDecodedId = async (id: string) => {
+    setScannerOn(false);
+    setActiveTab('id');
+    setCertIdInput(id);
+    setIdError('');
+    setIdResult(null);
+    setIdLoading(true);
+    markSlow(setIdSlow);
+    try {
+      const data = await fetchVerification(id, () =>
+        setIdError('The server is waking up (free hosting can take up to 50 seconds). Retrying...')
+      );
+      setIdResult(data);
+      setIdError('');
+    } catch (err) {
+      setIdError(verifyRequestError(err));
+    } finally {
+      setIdLoading(false);
+      setIdSlow(false);
+    }
+  };
+
+  const handleIdSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanId = certIdInput.trim();
-    if (!cleanId) {
-      setIdError('Please enter a valid certificate ID');
+    const parsed = validateCertificateId(certIdInput);
+    if (!parsed.ok) {
+      setIdError(parsed.error);
+      setIdResult(null);
       return;
     }
+    setCertIdInput(parsed.id);
+    setIdError('');
+    setIdResult(null);
     setIdLoading(true);
-    router.push(`/verify/${encodeURIComponent(cleanId)}`);
-  };
-
-  const startCameraScanner = async () => {
-    setCameraError('');
+    markSlow(setIdSlow);
     try {
-      const { Html5Qrcode } = await import('html5-qrcode');
-      const scanner = new Html5Qrcode('qr-reader-container');
-      html5QrCodeRef.current = scanner;
-
-      await scanner.start(
-        { facingMode: 'environment' },
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-        },
-        (decodedText: string) => {
-          stopCameraScanner();
-          let targetId = decodedText.trim();
-          if (targetId.includes('/verify/')) {
-            const parts = targetId.split('/verify/');
-            targetId = parts[parts.length - 1];
-          }
-          router.push(`/verify/${encodeURIComponent(targetId)}`);
-        },
-        () => {}
+      const data = await fetchVerification(parsed.id, () =>
+        setIdError('The server is waking up (free hosting can take up to 50 seconds). Retrying...')
       );
-      setScannerStarted(true);
-    } catch (err: any) {
-      setCameraError(
-        err?.message || 'Unable to access camera. Please allow camera permissions or access over HTTPS.'
-      );
-      setScannerStarted(false);
+      setIdResult(data);
+      setIdError('');
+    } catch (err) {
+      setIdError(verifyRequestError(err));
+    } finally {
+      setIdLoading(false);
+      setIdSlow(false);
     }
   };
 
-  const stopCameraScanner = async () => {
-    if (html5QrCodeRef.current) {
-      try {
-        if (html5QrCodeRef.current.isScanning) {
-          await html5QrCodeRef.current.stop();
-        }
-        html5QrCodeRef.current.clear();
-      } catch (e) {
-        console.error(e);
-      }
-      html5QrCodeRef.current = null;
-    }
-    setScannerStarted(false);
+  const pickFile = (file?: File | null) => {
+    setUploadFile(file || null);
+    setUploadError('');
+    setUploadResult(null);
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(file ? URL.createObjectURL(file) : '');
   };
 
   const handleUploadSubmit = async (e: React.FormEvent) => {
@@ -109,69 +123,37 @@ export default function VerifyPage() {
     setUploadError('');
     setUploadLoading(true);
     setUploadResult(null);
-
-    const formData = new FormData();
-    formData.append('file', uploadFile);
+    markSlow(setUploadSlow);
 
     try {
-      // Public upload call - no login or token required
-      const res = await api.post('/api/verification/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      setUploadResult(res.data);
-    } catch (err: any) {
-      setUploadError(
-        err.response?.data?.detail ||
-          'Document verification failed. Ensure the server is reachable and the image is clear.'
+      const prepared = await downscaleImage(uploadFile);
+      const formData = new FormData();
+      formData.append('file', prepared);
+      const res = await withWakeRetry(
+        () =>
+          api.post('/api/verification/upload', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          }),
+        () =>
+          setUploadError(
+            'The server is waking up (free hosting can take up to 50 seconds). Retrying...'
+          )
       );
+      setUploadResult(res.data);
+      setUploadError('');
+    } catch (err: any) {
+      setUploadError(verifyRequestError(err));
     } finally {
       setUploadLoading(false);
-    }
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'VERIFIED':
-        return (
-          <span className="px-3.5 py-1.5 bg-emerald-100 text-emerald-800 rounded-full font-bold text-xs uppercase tracking-wider inline-flex items-center space-x-1.5 shadow-sm">
-            <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
-            <span>VERIFIED</span>
-          </span>
-        );
-      case 'MISMATCH':
-        return (
-          <span className="px-3.5 py-1.5 bg-amber-100 text-amber-800 rounded-full font-bold text-xs uppercase tracking-wider inline-flex items-center space-x-1.5 shadow-sm">
-            <span className="w-2 h-2 rounded-full bg-amber-600"></span>
-            <span>MISMATCH (TAMPERED)</span>
-          </span>
-        );
-      case 'REVOKED':
-        return (
-          <span className="px-3.5 py-1.5 bg-red-100 text-red-800 rounded-full font-bold text-xs uppercase tracking-wider inline-flex items-center space-x-1.5 shadow-sm">
-            <span className="w-2 h-2 rounded-full bg-red-600"></span>
-            <span>REVOKED</span>
-          </span>
-        );
-      case 'NOT_FOUND':
-        return (
-          <span className="px-3.5 py-1.5 bg-slate-200 text-slate-800 rounded-full font-bold text-xs uppercase tracking-wider inline-flex items-center space-x-1.5 shadow-sm">
-            <span className="w-2 h-2 rounded-full bg-slate-600"></span>
-            <span>NOT FOUND (FAKE)</span>
-          </span>
-        );
-      default:
-        return (
-          <span className="px-3.5 py-1.5 bg-slate-100 text-slate-800 rounded-full font-bold text-xs uppercase tracking-wider shadow-sm">
-            {status}
-          </span>
-        );
+      setUploadSlow(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-between text-slate-900">
+    <div className="min-h-screen bg-slate-50 flex flex-col justify-between text-slate-900 overflow-x-hidden">
       <Head>
         <title>Verify Certificate - CertiVerify AI</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta
           name="description"
           content="Public Certificate Verification: Scan QR code, upload image, or enter certificate ID without logging in."
@@ -180,8 +162,7 @@ export default function VerifyPage() {
 
       <Navbar activePage="verify" />
 
-      <main className="max-w-4xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10 flex-1">
-        {/* Header */}
+      <main className="max-w-4xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 flex-1">
         <div className="text-center max-w-2xl mx-auto mb-8">
           <div className="inline-flex items-center space-x-2 px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-full text-xs font-semibold text-emerald-800 mb-3">
             <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
@@ -191,271 +172,142 @@ export default function VerifyPage() {
             Verify a Certificate
           </h1>
           <p className="mt-2 text-sm text-slate-600">
-            Scan a certificate QR code with your camera or upload an image to cross-check against the official institutional database.
+            Scan a QR code, type a certificate ID, or upload a photo. Anyone can verify without an account.
           </p>
         </div>
 
-        {/* Tab Selection */}
-        <div className="flex justify-center mb-8">
-          <div className="bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm inline-flex space-x-1">
-            <button
-              onClick={() => {
-                setActiveTab('scan');
-              }}
-              className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition ${
-                activeTab === 'scan'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
-            >
-              📷 Scan QR Code
-            </button>
-            <button
-              onClick={() => {
-                stopCameraScanner();
-                setActiveTab('upload');
-              }}
-              className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition ${
-                activeTab === 'upload'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
-            >
-              📄 Upload Certificate Image
-            </button>
-            <button
-              onClick={() => {
-                stopCameraScanner();
-                setActiveTab('id');
-              }}
-              className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition ${
-                activeTab === 'id'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
-            >
-              🔢 Enter ID
-            </button>
+        <div className="flex justify-center mb-8 overflow-x-auto">
+          <div className="bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm inline-flex min-w-0">
+            {([
+              ['scan', 'Scan QR'],
+              ['upload', 'Upload image'],
+              ['id', 'Enter ID'],
+            ] as const).map(([tab, label]) => (
+              <button
+                key={tab}
+                onClick={() => {
+                  if (tab !== 'scan') setScannerOn(false);
+                  setActiveTab(tab);
+                }}
+                className={`min-h-[44px] px-4 sm:px-5 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap ${
+                  activeTab === tab
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* TAB 1: SCAN QR CODE */}
         {activeTab === 'scan' && (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8 max-w-2xl mx-auto text-center">
             <h3 className="text-lg font-bold text-slate-900 mb-1">Scan Certificate QR Code</h3>
             <p className="text-xs text-slate-500 mb-6">
-              Hold the certificate QR code up to your camera. The verification result will load automatically.
+              Tap Start camera so the browser can ask for permission, then point at the QR code.
             </p>
-
-            {cameraError && (
-              <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl text-xs text-left">
-                <span className="font-bold block mb-1">Camera Notice:</span>
-                {cameraError}
+            {!scannerOn ? (
+              <div className="space-y-4">
+                <div className="bg-slate-900 rounded-2xl p-8 text-slate-400 text-sm">
+                  Camera is off until you tap Start camera.
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setScannerOn(true)}
+                  className="min-h-[44px] px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md text-sm"
+                >
+                  Start camera
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <QrScanner onDecoded={handleDecodedId} />
+                <button
+                  type="button"
+                  onClick={() => setScannerOn(false)}
+                  className="min-h-[44px] px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-sm"
+                >
+                  Stop camera
+                </button>
               </div>
             )}
-
-            <div className="bg-slate-900 rounded-2xl p-4 text-white mb-6 shadow-inner relative overflow-hidden max-w-md mx-auto">
-              <div
-                id="qr-reader-container"
-                className="w-full min-h-[260px] flex items-center justify-center rounded-xl overflow-hidden bg-slate-950"
-              >
-                {!scannerStarted && (
-                  <div className="text-center p-6 space-y-3">
-                    <div className="w-14 h-14 rounded-full bg-blue-500/20 text-blue-400 mx-auto flex items-center justify-center text-2xl">
-                      📷
-                    </div>
-                    <p className="text-xs text-slate-400">
-                      Camera viewfinder inactive. Click below to begin scanning.
-                    </p>
-                  </div>
+            {(idLoading || idResult || idError) && activeTab === 'scan' && (
+              <div className="mt-6 text-left">
+                {idLoading && (
+                  <p className="text-sm text-blue-700">
+                    {idSlow
+                      ? 'Connecting to server... The server may take up to 50 seconds to wake up.'
+                      : 'Checking certificate…'}
+                  </p>
                 )}
+                {idError && <p className="text-sm text-red-700">{idError}</p>}
+                {idResult && <VerificationResult result={idResult} />}
               </div>
-            </div>
-
-            <div className="flex justify-center space-x-3">
-              {!scannerStarted ? (
-                <button
-                  type="button"
-                  onClick={startCameraScanner}
-                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md shadow-blue-500/20 transition text-sm"
-                >
-                  Start Camera Scanner
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={stopCameraScanner}
-                  className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-md transition text-sm"
-                >
-                  Stop Camera Scanner
-                </button>
-              )}
-            </div>
+            )}
           </div>
         )}
 
-        {/* TAB 2: UPLOAD CERTIFICATE IMAGE */}
         {activeTab === 'upload' && (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8 max-w-3xl mx-auto">
             <h3 className="text-lg font-bold text-slate-900 mb-1">Upload Certificate Image</h3>
             <p className="text-xs text-slate-500 mb-6">
-              Upload a clear PNG, JPG, JPEG or WEBP image of the certificate. The system reads the QR code and compares printed details against the official database.
+              Use a gallery photo or take a picture. Large phone photos are resized before upload.
             </p>
 
             {uploadError && (
-              <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-4 rounded-xl text-xs text-red-700">
+              <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-4 rounded-xl text-sm text-red-700">
                 {uploadError}
               </div>
             )}
 
             <form onSubmit={handleUploadSubmit} className="space-y-6">
-              <div className="border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center hover:border-blue-500 transition cursor-pointer bg-slate-50/60">
+              <div className="border-2 border-dashed border-slate-300 rounded-2xl p-6 text-center bg-slate-50/60 space-y-3">
                 <input
                   type="file"
-                  accept="image/png, image/jpeg, image/jpg, image/webp"
-                  onChange={(e) => {
-                    setUploadFile(e.target.files?.[0] || null);
-                    setUploadError('');
-                  }}
-                  className="block w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-5 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer"
+                  accept="image/*"
+                  onChange={(e) => pickFile(e.target.files?.[0])}
+                  className="block w-full text-sm text-slate-500 file:mr-4 file:min-h-[44px] file:py-2.5 file:px-5 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white"
                 />
-                <p className="text-xs text-slate-400 mt-3">
-                  Accepted formats: PNG, JPG, JPEG, WEBP (Max 5 MB)
-                </p>
+                <label className="inline-flex items-center justify-center min-h-[44px] px-5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-bold cursor-pointer">
+                  Take photo
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={(e) => pickFile(e.target.files?.[0])}
+                  />
+                </label>
+                <p className="text-xs text-slate-400">PNG, JPG, JPEG, WEBP. Photos are scaled to 1600px.</p>
+                {previewUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={previewUrl} alt="Preview" className="max-h-56 mx-auto rounded-lg border border-slate-200" />
+                )}
               </div>
 
               <button
                 type="submit"
                 disabled={uploadLoading}
-                className="w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md shadow-blue-500/20 transition disabled:opacity-50 text-sm"
+                className="w-full min-h-[44px] py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm disabled:opacity-50"
               >
-                {uploadLoading ? 'Reading QR & Cross-Checking Database...' : 'Upload & Verify Certificate'}
+                {uploadLoading
+                  ? uploadSlow
+                    ? 'Connecting to server...'
+                    : 'Reading QR & Cross-Checking Database...'
+                  : 'Upload & Verify Certificate'}
               </button>
+              {uploadLoading && (
+                <p className="text-xs text-slate-500 text-center">
+                  The server may take up to 50 seconds to wake up.
+                </p>
+              )}
             </form>
 
-            {/* Verification Result Display */}
-            {uploadResult && (
-              <div className="mt-8 pt-8 border-t border-slate-200">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
-                  <div>
-                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
-                      Verification Result
-                    </span>
-                    <span className="text-lg font-bold text-slate-900 font-mono">
-                      {uploadResult.certificate_id || 'Certificate ID Unknown'}
-                    </span>
-                  </div>
-                  <div>{getStatusBadge(uploadResult.verification_status)}</div>
-                </div>
-
-                <div className="mt-4">
-                  <p className="text-sm text-slate-700 font-medium mb-4">{uploadResult.message}</p>
-
-                  {/* NOT FOUND specific notice */}
-                  {uploadResult.verification_status === 'NOT_FOUND' && (
-                    <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 mb-6 font-semibold">
-                      The certificate ID from the QR code is not registered in the official database.
-                    </div>
-                  )}
-
-                  {/* Official Record vs Extracted Details Side-by-Side */}
-                  {uploadResult.official_record && (
-                    <div className="bg-slate-50 rounded-xl p-5 border border-slate-200 mb-6">
-                      <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3">
-                        Official Institutional Record vs Certificate Details
-                      </h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                        <div className="bg-white p-3.5 rounded-lg border border-slate-200">
-                          <span className="text-slate-400 block font-medium">Candidate Name</span>
-                          <span className="font-bold text-slate-900 text-sm">
-                            {uploadResult.official_record.student_name}
-                          </span>
-                        </div>
-                        <div className="bg-white p-3.5 rounded-lg border border-slate-200">
-                          <span className="text-slate-400 block font-medium">Roll / Reg Number</span>
-                          <span className="font-mono font-bold text-slate-900 text-sm">
-                            {uploadResult.official_record.roll_number}
-                          </span>
-                        </div>
-                        <div className="bg-white p-3.5 rounded-lg border border-slate-200">
-                          <span className="text-slate-400 block font-medium">Awarding Institution</span>
-                          <span className="font-semibold text-slate-800">
-                            {uploadResult.official_record.college_name}
-                          </span>
-                        </div>
-                        <div className="bg-white p-3.5 rounded-lg border border-slate-200">
-                          <span className="text-slate-400 block font-medium">Graduation Year</span>
-                          <span className="font-semibold text-slate-800">
-                            {uploadResult.official_record.graduation_year}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Field Mismatches Highlighted Side-by-Side */}
-                  {uploadResult.mismatching_fields &&
-                    Object.keys(uploadResult.mismatching_fields).length > 0 && (
-                      <div className="mb-6">
-                        <h4 className="text-xs font-bold text-amber-700 uppercase tracking-wider mb-2">
-                          Differing Fields Identified (Tampered)
-                        </h4>
-                        <div className="space-y-2">
-                          {Object.entries(uploadResult.mismatching_fields).map(([key, val]: any) => (
-                            <div
-                              key={key}
-                              className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs"
-                            >
-                              <span className="font-bold text-amber-900 uppercase block mb-1">
-                                {key.replace('_', ' ')}
-                              </span>
-                              <div className="grid grid-cols-2 gap-2 mt-1">
-                                <div>
-                                  <span className="text-slate-500 block">Database Value:</span>
-                                  <span className="font-bold text-slate-900">{val.official}</span>
-                                </div>
-                                <div>
-                                  <span className="text-slate-500 block">Certificate Value:</span>
-                                  <span className="font-bold text-amber-800">{val.extracted}</span>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                  {/* Matching Fields */}
-                  {uploadResult.matching_fields &&
-                    Object.keys(uploadResult.matching_fields).length > 0 && (
-                      <div>
-                        <h4 className="text-xs font-bold text-emerald-700 uppercase tracking-wider mb-2">
-                          Matching Fields Verified
-                        </h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                          {Object.entries(uploadResult.matching_fields).map(([key, val]: any) => (
-                            <div
-                              key={key}
-                              className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between"
-                            >
-                              <span className="capitalize text-emerald-900 font-medium">
-                                {key.replace('_', ' ')}
-                              </span>
-                              <span className="text-emerald-700 font-bold font-mono">
-                                {val.official}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                </div>
-              </div>
-            )}
+            {uploadResult && <VerificationResult result={uploadResult} />}
           </div>
         )}
 
-        {/* TAB 3: ENTER CERTIFICATE ID */}
         {activeTab === 'id' && (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8 max-w-2xl mx-auto">
             <h3 className="text-lg font-bold text-slate-900 mb-1">Search by Certificate ID</h3>
@@ -464,34 +316,40 @@ export default function VerifyPage() {
             </p>
 
             {idError && (
-              <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-3 rounded text-xs text-red-700">
+              <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-3 rounded text-sm text-red-700">
                 {idError}
               </div>
             )}
 
             <form onSubmit={handleIdSubmit} className="space-y-4">
-              <div>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. CERT-AIT-2024-00060"
-                  value={certIdInput}
-                  onChange={(e) => {
-                    setCertIdInput(e.target.value);
-                    setIdError('');
-                  }}
-                  className="w-full border border-slate-300 rounded-xl px-4 py-3 text-base font-mono uppercase focus:outline-none focus:ring-2 focus:ring-blue-600 tracking-wide"
-                />
-              </div>
-
+              <input
+                type="text"
+                required
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
+                placeholder="e.g. CERT-AIT-2024-00001"
+                value={certIdInput}
+                onChange={(e) => {
+                  setCertIdInput(e.target.value);
+                  setIdError('');
+                }}
+                className="w-full min-h-[44px] border border-slate-300 rounded-xl px-4 py-3 text-base font-mono uppercase focus:outline-none focus:ring-2 focus:ring-blue-600 tracking-wide"
+              />
               <button
                 type="submit"
                 disabled={idLoading}
-                className="w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md shadow-blue-500/20 transition text-sm disabled:opacity-50"
+                className="w-full min-h-[44px] py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm disabled:opacity-50"
               >
-                {idLoading ? 'Querying Database...' : 'Check Certificate ID'}
+                {idLoading
+                  ? idSlow
+                    ? 'Connecting to server...'
+                    : 'Querying Database...'
+                  : 'Check Certificate ID'}
               </button>
             </form>
+
+            {idResult && <VerificationResult result={idResult} />}
           </div>
         )}
       </main>

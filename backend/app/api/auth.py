@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.core.database import get_db
@@ -11,7 +12,8 @@ router = APIRouter()
 
 @router.post("/login", response_model=Token)
 async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.email == req.email))
+    email = req.email
+    result = await db.execute(select(User).where(func.lower(User.email) == email))
     user = result.scalars().first()
     if not user or not verify_password(req.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
@@ -38,13 +40,14 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
 
 @router.post("/register-company", response_model=UserOut)
 async def register_company(data: UserCreate, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.email == data.email))
+    email = data.email.lower() if isinstance(data.email, str) else data.email
+    result = await db.execute(select(User).where(func.lower(User.email) == email))
     if result.scalars().first():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
 
     new_user = User(
         full_name=data.full_name,
-        email=data.email,
+        email=email,
         password_hash=get_password_hash(data.password),
         role=UserRole.COMPANY,
         company_name=data.company_name or data.full_name,

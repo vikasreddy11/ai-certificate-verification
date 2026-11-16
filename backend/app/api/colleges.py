@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from typing import List
@@ -70,13 +71,14 @@ async def create_college_admin(
     if not college:
         raise HTTPException(status_code=404, detail="College not found")
 
-    existing_user = await db.execute(select(User).where(User.email == data.email))
+    email = data.email.lower() if isinstance(data.email, str) else data.email
+    existing_user = await db.execute(select(User).where(func.lower(User.email) == email))
     if existing_user.scalars().first():
         raise HTTPException(status_code=400, detail="Email already registered")
 
     admin = User(
         full_name=data.full_name,
-        email=data.email,
+        email=email,
         password_hash=get_password_hash(data.password),
         role=UserRole.COLLEGE_ADMIN,
         college_id=college_id

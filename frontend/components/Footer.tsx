@@ -47,13 +47,8 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/portal/institution" className="hover:text-white transition">
-                  University Roster
-                </Link>
-              </li>
-              <li>
-                <Link href="/portal/company" className="hover:text-white transition">
-                  Recruiter OCR Studio
+                <Link href="/login" className="hover:text-white transition">
+                  Admin login
                 </Link>
               </li>
             </ul>
@@ -71,18 +66,13 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/portal/company" className="hover:text-white transition">
-                  Company Portal
-                </Link>
-              </li>
-              <li>
                 <Link href="/portal/admin" className="hover:text-white transition">
                   Super Admin Console
                 </Link>
               </li>
               <li>
                 <Link href="/login" className="hover:text-white transition">
-                  Unified Sign In
+                  Admin Sign In
                 </Link>
               </li>
             </ul>

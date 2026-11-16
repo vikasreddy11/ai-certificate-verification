@@ -69,7 +69,7 @@ export default function CollegeCertificatesPage() {
         <title>Manage Certificates & QR - CertiVerify AI</title>
       </Head>
 
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Certificate Generation & QR Vault</h1>
           <p className="text-sm text-slate-500">Generate tamper-proof Ed25519-signed credentials and QR codes for your students.</p>
@@ -88,7 +88,8 @@ export default function CollegeCertificatesPage() {
         ) : certificates.length === 0 ? (
           <div className="p-8 text-center text-slate-500">No certificates generated yet.</div>
         ) : (
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
+          <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200 text-sm hidden sm:table">
             <thead className="bg-slate-50 text-slate-600 uppercase text-xs font-semibold">
               <tr>
                 <th className="px-6 py-4 text-left">Certificate ID</th>
@@ -135,6 +136,32 @@ export default function CollegeCertificatesPage() {
               ))}
             </tbody>
           </table>
+          <div className="sm:hidden divide-y divide-slate-100">
+            {certificates.map((cert) => (
+              <div key={cert.id} className="p-4 space-y-2">
+                <div className="font-mono font-bold text-blue-600 break-all">{cert.certificate_id}</div>
+                <div className="font-semibold text-slate-800">{cert.student_name}</div>
+                <div className="text-sm text-slate-600">{cert.graduation_year} · {cert.status}</div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setQrModalUrl(`${API_BASE_URL}/api/certificates/${cert.certificate_id}/qr`)}
+                    className="min-h-[44px] px-3 bg-blue-50 text-blue-700 rounded text-xs font-medium"
+                  >
+                    View QR
+                  </button>
+                  {cert.status === 'ACTIVE' && (
+                    <button
+                      onClick={() => handleRevoke(cert.certificate_id)}
+                      className="min-h-[44px] px-3 bg-red-50 text-red-600 rounded text-xs font-medium"
+                    >
+                      Revoke
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          </div>
         )}
       </div>
 
