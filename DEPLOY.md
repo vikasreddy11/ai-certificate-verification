@@ -79,3 +79,4 @@ In your frontend deployment settings (or `.env.production`):
 NEXT_PUBLIC_API_URL=https://<your-backend>.onrender.com
 ```
 Re-deploy the frontend on Render.
+

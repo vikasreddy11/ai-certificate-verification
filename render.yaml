@@ -23,3 +23,4 @@ services:
 databases:
   - name: certiverify-db
     plan: free
+

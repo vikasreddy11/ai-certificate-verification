@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,6 +8,7 @@ from app.core.security import decode_access_token
 from app.models import User, UserRole
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+oauth2_optional = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)) -> User:
     credentials_exception = HTTPException(
@@ -26,6 +28,16 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
     if user is None or not user.is_active:
         raise credentials_exception
     return user
+
+async def get_optional_user(token: Optional[str] = Depends(oauth2_optional), db: AsyncSession = Depends(get_db)) -> Optional[User]:
+    if not token:
+        return None
+    payload = decode_access_token(token)
+    if not payload or not payload.get("sub"):
+        return None
+    result = await db.execute(select(User).where(User.email == payload["sub"]))
+    user = result.scalars().first()
+    return user if user and user.is_active else None
 
 def require_role(roles: list[UserRole]):
     def role_checker(current_user: User = Depends(get_current_user)) -> User:

@@ -28,7 +28,7 @@ export default function Navbar({ activePage = 'home' }: NavbarProps) {
           </Link>
 
           {/* Desktop Navigation Links */}
-          <div className="hidden lg:flex items-center space-x-1">
+          <div className="hidden md:flex items-center space-x-1">
             <Link
               href="/"
               className={`px-3.5 py-2 rounded-lg text-sm font-semibold transition ${
@@ -46,41 +46,31 @@ export default function Navbar({ activePage = 'home' }: NavbarProps) {
               How It Works
             </Link>
             <Link
-              href="/portal/institution"
+              href="/verify"
               className={`px-3.5 py-2 rounded-lg text-sm font-semibold transition ${
-                activePage === 'institution'
+                activePage === 'verify'
                   ? 'text-blue-600 bg-blue-50/70'
                   : 'text-slate-600 hover:text-blue-600 hover:bg-slate-50'
               }`}
             >
-              For Institutions
-            </Link>
-            <Link
-              href="/portal/company"
-              className={`px-3.5 py-2 rounded-lg text-sm font-semibold transition ${
-                activePage === 'company'
-                  ? 'text-blue-600 bg-blue-50/70'
-                  : 'text-slate-600 hover:text-blue-600 hover:bg-slate-50'
-              }`}
-            >
-              For Companies
+              Verify Certificate
             </Link>
           </div>
 
           {/* Action CTAs */}
           <div className="hidden md:flex items-center space-x-3">
             <Link
-              href="/login"
-              className="px-4 py-2.5 text-sm font-semibold text-slate-700 hover:text-blue-600 hover:bg-slate-50 rounded-lg transition"
-            >
-              Sign In
-            </Link>
-            <Link
               href="/verify"
               className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-sm shadow-blue-500/20 transition flex items-center space-x-2"
             >
               <span>Verify Certificate</span>
               <span className="text-blue-200">→</span>
+            </Link>
+            <Link
+              href="/login"
+              className="px-4 py-2.5 text-sm font-semibold text-slate-700 hover:text-blue-600 hover:bg-slate-50 border border-slate-200 rounded-xl transition"
+            >
+              Admin Login
             </Link>
           </div>
 
@@ -122,27 +112,13 @@ export default function Navbar({ activePage = 'home' }: NavbarProps) {
             How It Works
           </Link>
           <Link
-            href="/portal/institution"
+            href="/verify"
             onClick={() => setMobileMenuOpen(false)}
             className="block px-3 py-2.5 rounded-lg text-base font-semibold text-slate-700 hover:bg-slate-50 hover:text-blue-600"
           >
-            For Institutions
-          </Link>
-          <Link
-            href="/portal/company"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block px-3 py-2.5 rounded-lg text-base font-semibold text-slate-700 hover:bg-slate-50 hover:text-blue-600"
-          >
-            For Companies
+            Verify Certificate
           </Link>
           <div className="pt-3 border-t border-slate-100 space-y-2">
-            <Link
-              href="/login"
-              onClick={() => setMobileMenuOpen(false)}
-              className="block w-full text-center py-2.5 px-4 text-sm font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg"
-            >
-              Sign In
-            </Link>
             <Link
               href="/verify"
               onClick={() => setMobileMenuOpen(false)}
@@ -150,10 +126,16 @@ export default function Navbar({ activePage = 'home' }: NavbarProps) {
             >
               Verify Certificate
             </Link>
+            <Link
+              href="/login"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block w-full text-center py-2.5 px-4 text-sm font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200"
+            >
+              Admin Login
+            </Link>
           </div>
         </div>
       )}
     </nav>
   );
 }
-

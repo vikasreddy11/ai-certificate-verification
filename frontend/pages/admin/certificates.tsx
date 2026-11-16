@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import DashboardLayout from '../../components/DashboardLayout';
-import api from '../../utils/api';
+import api, { API_BASE_URL } from '../../utils/api';
 
 export default function AdminCertificatesPage() {
   const [certificates, setCertificates] = useState<any[]>([]);
@@ -160,7 +160,7 @@ export default function AdminCertificatesPage() {
                   </td>
                   <td className="px-6 py-4 text-right space-x-2">
                     <button
-                      onClick={() => setQrModalUrl(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/certificates/${cert.certificate_id}/qr`)}
+                      onClick={() => setQrModalUrl(`${API_BASE_URL}/api/certificates/${cert.certificate_id}/qr`)}
                       className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded text-xs font-medium"
                     >
                       QR Code

@@ -7,7 +7,7 @@ from datetime import datetime
 import json
 
 from app.core.database import get_db
-from app.core.deps import get_current_user
+from app.core.deps import get_optional_user
 from app.core.security import verify_certificate_signature
 from app.models import Certificate, Student, College, VerificationLog, VerificationStatus, CertificateStatus, User, UserRole
 from app.schemas import VerificationResultOut
@@ -158,13 +158,27 @@ async def verify_by_upload(
     file: UploadFile = File(...),
     certificate_id: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user)
+    current_user: Optional[User] = Depends(get_optional_user)
 ):
     """
-    Company/Recruiter verification pipeline:
-    Accepts JPG/PNG/PDF, performs OCR, extracts fields, and matches against the database.
+    Public / Recruiter verification pipeline:
+    Accepts PNG/JPG/JPEG/WEBP image, reads QR code, runs OCR, extracts fields, and matches against the database.
     """
+    # Validate content type
+    allowed_types = {"image/png", "image/jpeg", "image/jpg", "image/webp"}
+    content_type = (file.content_type or "").lower()
+    if content_type not in allowed_types:
+        filename = (file.filename or "").lower()
+        if not any(filename.endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".webp"]):
+            raise HTTPException(
+                status_code=400,
+                detail="Unsupported file format. Please upload a certificate image (PNG, JPG, JPEG, WEBP). PDF documents are not supported yet."
+            )
+
     file_bytes = await file.read()
+    if len(file_bytes) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File too large. Maximum file size allowed is 5 MB.")
+
     raw_ocr_text = run_ocr(file_bytes)
     extracted = extract_structured_fields(raw_ocr_text)
 
