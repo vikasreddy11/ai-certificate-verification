@@ -1,12 +1,8 @@
 import axios from 'axios';
 
-<<<<<<< HEAD
-export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'https://certiverify-backend-rmvy.onrender.com').replace(/\/$/, '');
-=======
 export const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_URL || 'https://certiverify-backend-rmvy.onrender.com'
 ).replace(/\/$/, '');
->>>>>>> 2e22d99 (updates)
 
 const api = axios.create({
   baseURL: API_BASE_URL,

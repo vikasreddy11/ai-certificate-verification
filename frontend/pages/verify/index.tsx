@@ -4,16 +4,12 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/router';
 import Navbar from '../../components/Navbar';
 import Footer from '../../components/Footer';
-<<<<<<< HEAD
-import api from '../../utils/api';
-=======
 import VerificationResult from '../../components/VerificationResult';
 import api, { withWakeRetry } from '../../utils/api';
 import { downscaleImage } from '../../utils/image';
 import { fetchVerification, validateCertificateId, verifyRequestError } from '../../utils/verifyApi';
 
 const QrScanner = dynamic(() => import('../../components/QrScanner'), { ssr: false });
->>>>>>> 2e22d99 (updates)
 
 export default function VerifyPage() {
   const router = useRouter();
@@ -83,17 +79,18 @@ export default function VerifyPage() {
     e.preventDefault();
     const parsed = validateCertificateId(certIdInput);
     if (!parsed.ok) {
-      setIdError(parsed.error);
+      setIdError('error' in parsed ? parsed.error : 'Invalid certificate ID.');
       setIdResult(null);
       return;
     }
-    setCertIdInput(parsed.id);
+    const validId = parsed.id;
+    setCertIdInput(validId);
     setIdError('');
     setIdResult(null);
     setIdLoading(true);
     markSlow(setIdSlow);
     try {
-      const data = await fetchVerification(parsed.id, () =>
+      const data = await fetchVerification(validId, () =>
         setIdError('The server is waking up (free hosting can take up to 50 seconds). Retrying...')
       );
       setIdResult(data);
